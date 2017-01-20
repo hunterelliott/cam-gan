@@ -54,7 +54,8 @@ nDirs = numel(imageDirs);
 
 figOutDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/Processing_Figures'; %For mask validation figures
 
-outParentDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/PreProcessed';
+%outParentDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/PreProcessed';
+outParentDir = '/ssd/CAMELYON';
 
 
 
@@ -85,6 +86,7 @@ for iDir = 1:nDirs
     imFiles = imDir(imageDirs{iDir});
     nIms = numel(imFiles);
     maskFiles = imDir(maskDirs{iDir});
+    maskNamesShort = cellfun(@(x)(x(1:end-9)),{maskFiles.name},'Unif',0);%For comparing to image name
     nMasks = numel(maskFiles);
 
     disp(['Processing directory ' imageDirs{iDir}])
@@ -99,7 +101,7 @@ for iDir = 1:nDirs
         
         
         
-         %% ------ Masking ----- %%
+        %% ------ Masking ----- %%
 
         %Mask out background and select crops from tumor areas so we can control
         %class balance more easily during training.
@@ -109,10 +111,17 @@ for iDir = 1:nDirs
 
         tic
         im = imread([imageDirs{iDir} filesep imFiles(iIm).name],'Index',resForMask);
+        mTumor = false(size(im,1),size(im,2));
         if ~isempty(maskDirs{iDir})
-            mTumor = imread([maskDirs{iDir} filesep maskFiles(iIm).name],'Index',resForMask);
-        else
-            mTumor = false(size(im,1),size(im,2));
+            %Find the corresponding mask file
+            
+            iMaskFile = find(strcmpi(imFiles(iIm).name(1:end-4),maskNamesShort));
+            
+            if ~isempty(iMaskFile)
+                mTumor = imread([maskDirs{iDir} filesep maskFiles(iMaskFile).name],'Index',resForMask);
+            else
+                disp(['No mask file found for image ' num2str(iIm) ' directory ' num2str(iDir)]);                
+            end                    
         end
 
         imX = rgb2hsv(im);
@@ -237,7 +246,7 @@ for iDir = 1:nDirs
         
         disp(['Done, output ' num2str(nCrops) ' crops in ' num2str(toc) ' seconds'])        
         
-    end
+     end
     allFileList{iDir} = currFileList;
     allClassList{iDir} = currClassList;                        
                     
