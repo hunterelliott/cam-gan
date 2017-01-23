@@ -14,26 +14,28 @@ import cam_gan_ops as cgo
 # ---------- Specify unsupervised model -------#
 #This model, trained in a fully unsupervised manner, is used for initialization
 
-initModel = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN/Snapshots/CAMELYON_Balanced_EarlyStart60kPer3_128_resume_iter3000.ckpt'
+initModel = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN/Snapshots/CAMELYON_Balanced_EarlyStart60kPer3_128_resume_iter5000.ckpt'
 
 
 # ---- Specify data ----- 
 
 #trainParentDir = '/ssd/CAMELYON/Train'
 trainParentDir = '/ssd/CAMELYON/SmallDevSet/Train'
+testParentDir = '/ssd/CAMELYON/SmallDevSet/Test'
 #testParentDir = '/ssd/CAMELYON/Test'
-maxImPerClass = int(1e4) #Since we are doing kludigy all-data-in-RAM for speed we sub-sample the training datasets
+maxImPerClass = int(1e3) #Since we are doing kludigy all-data-in-RAM for speed we sub-sample the training datasets
+maxImPerClassTest = int(2e2)
 
 # ---- Classifier module architecture  --- #
 
 #Width of fully-connected (inner product) layers that will be connected to the last ip layer of the discriminator.
-ipLayerWidth = (512, 256, 128)
+ipLayerWidth = (1024, 512, 256)
 nIPLayers = len(ipLayerWidth)
 
 # --- Optimization --- #
 
-baseLR = 1e-3 #Base step size for ADAM optimizer
-nIters = int(5e3) #Number of iterations
+baseLR = 1e-4 #Base step size for ADAM optimizer
+nIters = int(5e2) #Number of iterations
 
 # --- Loggin / saving ---#
 
@@ -42,7 +44,7 @@ logInterval = int(2e1) #How fequently to calculate val accuracy/log loss
 
 # --- GPUs -----
 
-gpuID = 1 #GPU to use. -1 is CPU
+gpuID = 0 #GPU to use. -1 is CPU
 if gpuID >= 0:
 	#Make only this GPU visible to TF
 	os.environ["CUDA_VISIBLE_DEVICES"]=str(gpuID)
@@ -62,6 +64,9 @@ print("Loading training data from " + trainParentDir)
 trainIms,trainLabels,classNames,nImsPerClass = cgo.load_class_data(trainParentDir,maxImPerClass)
 nClasses = len(classNames)
 
+print("Loading test data from " + testParentDir)
+testIms,testLabels,_,nImsPerClassTest = cgo.load_class_data(testParentDir,maxImPerClassTest)
+
 sessConfig = tf.ConfigProto(allow_soft_placement=True)
 
 with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
@@ -78,7 +83,7 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 	#Get the tensors we'll need for our classifier
 
 	#The last inner-product layer - will be the input features for our classifier
-	ipLast_D = tf.get_default_graph().get_tensor_by_name("discriminators_shared/Maximum_11:0")
+	ipLast_D = tf.get_default_graph().get_tensor_by_name("discriminators_shared/Maximum_5:0")
 	#Data placeholder
 	data = tf.get_default_graph().get_tensor_by_name("discriminators_shared/Placeholder:0")
 	batchSize = data.get_shape()[0]
@@ -110,8 +115,8 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 
 	labels = tf.placeholder("float",shape=(batchSize,nClasses))
 	
-	loss_C = tf.nn.softmax_cross_entropy_with_logits(forward_C,labels,name='loss_C')
-	cross_entropy_C = tf.reduce_mean(loss_C)
+	loss_C = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(forward_C,labels),name='loss_C')
+	#cross_entropy_C = tf.reduce_mean(loss_C)
 	
 	
 	evaluation = tf.equal(tf.argmax(forward_C_SoftMax,1),tf.argmax(labels,1))	
@@ -131,7 +136,9 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 
 	#Only optimize the classifier weights
 	optimizer = tf.train.AdamOptimizer(baseLR).minimize(loss_C,var_list=vars_C)
+	#optimizer = tf.train.AdamOptimizer(baseLR).minimize(loss_C)
 	
+	#TEMP - for testing variable preservation
 	Wtest = tf.get_default_graph().get_tensor_by_name("discriminators_shared/W_ip_0_G:0")
 	Wtest = Wtest.eval()
 
@@ -152,29 +159,32 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 
 	sess.run(tf.variables_initializer(initVars))
 
-
-#	sess.run(tf.variables_initializer(initVars))
-#	#Initialize the new variables
-#	sess.run(tf.variables_initializer(vars_C))
+#	sess.run(tf.global_variables_initializer())
 
 	train_loss = np.zeros(int(math.floor(nIters/logInterval)))
 	train_acc = np.zeros(int(math.floor(nIters/logInterval)))
+	test_loss = np.zeros(int(math.floor(nIters/logInterval)))
+	test_acc = np.zeros(int(math.floor(nIters/logInterval)))
 
 	print("Starting optimization...")
-	iVal = 0
+	iVal = -1
 	for iIter in range(0,nIters):
 
 		imBatch,labelBatch = cgo.get_class_batch(trainIms,trainLabels,batchSize)
-		ZBatch = np.random.uniform(-1,1,(batchSize,Z.get_shape()[1]))		
+		imBatchTest,labelBatchTest = cgo.get_class_batch(testIms,testLabels,batchSize)
+		ZBatch = np.random.uniform(-1,1,(batchSize,Z.get_shape()[1]))	#Tensorflow complains if you don't feed Z even though we're not using it	
 
 		optimizer.run(feed_dict={data:imBatch, labels:labelBatch, Z:ZBatch})
 
 		if iIter%logInterval == 0:
 			iVal += 1
-			train_loss[iVal] = cross_entropy_C.eval(feed_dict={data:imBatch, labels:labelBatch, Z:ZBatch})
+			train_loss[iVal] = loss_C.eval(feed_dict={data:imBatch, labels:labelBatch, Z:ZBatch})
 			train_acc[iVal] = accuracy.eval(feed_dict={data:imBatch, labels:labelBatch, Z:ZBatch})
 
-			print("Training loss " + str(train_loss[iVal]) + ", accuracy " + str(train_acc[iVal]))
+			test_loss[iVal] = loss_C.eval(feed_dict={data:imBatchTest, labels:labelBatchTest, Z:ZBatch})
+			test_acc[iVal] = accuracy.eval(feed_dict={data:imBatchTest, labels:labelBatchTest, Z:ZBatch})
+
+			print("Training loss " + str(train_loss[iVal]) + ", accuracy " + str(train_acc[iVal]) + " Test loss " + str(test_loss[iVal]) + ", accuracy " + str(test_acc[iVal]))			
 			print("Iteration " + str(iIter) + " of " + str(nIters))
 
 
