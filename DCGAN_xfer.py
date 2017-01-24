@@ -40,7 +40,12 @@ nIters = int(5e2) #Number of iterations
 # --- Loggin / saving ---#
 
 logInterval = int(2e1) #How fequently to calculate val accuracy/log loss
+outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/From_ModelXX_FitMLPOnly_Run1'
 
+testOutDir = outputDir + os.path.sep + 'Test'
+trainOutDir = outputDir + os.path.sep + 'Train'
+os.mkdir(testOutDir)
+os.mkdir(trainOutDir)
 
 # --- GPUs -----
 
@@ -122,7 +127,11 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 	evaluation = tf.equal(tf.argmax(forward_C_SoftMax,1),tf.argmax(labels,1))	
 	accuracy = tf.reduce_mean(tf.cast(evaluation,"float"))
 
+	#Use summary to log loss over time
+	tf.summary.scalar("Loss",loss_C)
+	tf.summary.scalar("Accuracy",accuracy)
 
+	summary_op = tf.summary.merge_all()
 	
 	#----------------------------
 	#----- Optimization  --------
@@ -158,15 +167,14 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 			
 
 	sess.run(tf.variables_initializer(initVars))
-
 #	sess.run(tf.global_variables_initializer())
 
-	train_loss = np.zeros(int(math.floor(nIters/logInterval)))
-	train_acc = np.zeros(int(math.floor(nIters/logInterval)))
-	test_loss = np.zeros(int(math.floor(nIters/logInterval)))
-	test_acc = np.zeros(int(math.floor(nIters/logInterval)))
+	test_summary_writer = tf.summary.FileWriter(testOutDir,graph=tf.get_default_graph())
+	train_summary_writer = tf.summary.FileWriter(trainOutDir,graph=tf.get_default_graph())
 
 	print("Starting optimization...")
+	startTime = time.time();	
+
 	iVal = -1
 	for iIter in range(0,nIters):
 
@@ -178,13 +186,14 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 
 		if iIter%logInterval == 0:
 			iVal += 1
-			train_loss[iVal] = loss_C.eval(feed_dict={data:imBatch, labels:labelBatch, Z:ZBatch})
-			train_acc[iVal] = accuracy.eval(feed_dict={data:imBatch, labels:labelBatch, Z:ZBatch})
 
-			test_loss[iVal] = loss_C.eval(feed_dict={data:imBatchTest, labels:labelBatchTest, Z:ZBatch})
-			test_acc[iVal] = accuracy.eval(feed_dict={data:imBatchTest, labels:labelBatchTest, Z:ZBatch})
-
-			print("Training loss " + str(train_loss[iVal]) + ", accuracy " + str(train_acc[iVal]) + " Test loss " + str(test_loss[iVal]) + ", accuracy " + str(test_acc[iVal]))			
+			summary_train,train_loss,train_acc= sess.run([summary_op,loss_C,accuracy],feed_dict={data:trainImBatch})
+			summary_test,test_loss,test_acc= sess.run([summary_op,loss_C,accuracy],feed_dict={data:testImBatch})
+			
+			train_summary_writer.add_summary(summary_train)
+			test_summary_writer.add_summary(summary_test)
+			
+			print("Training loss " + str(train_loss) + ", accuracy " + str(train_acc) + " Test loss " + str(test_loss) + ", accuracy " + str(test_acc))			
 			print("Iteration " + str(iIter) + " of " + str(nIters))
 
 
