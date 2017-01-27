@@ -3,6 +3,7 @@ import numpy as np
 import os
 import math as math
 from matplotlib import pyplot as plt
+import time
 
 import cam_gan_ops as cgo
 
@@ -14,17 +15,19 @@ import cam_gan_ops as cgo
 # ---------- Specify unsupervised model -------#
 #This model, trained in a fully unsupervised manner, is used for initialization
 
-initModel = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN/Snapshots/CAMELYON_Balanced_EarlyStart60kPer3_128_resume_iter5000.ckpt'
+initModel = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN/Snapshots/CAMELYON_Balanced_EarlyStart60kPer3_128_resume4_iter5000.ckpt'
 
 
 # ---- Specify data ----- 
 
 #trainParentDir = '/ssd/CAMELYON/Train'
-trainParentDir = '/ssd/CAMELYON/SmallDevSet/Train'
-testParentDir = '/ssd/CAMELYON/SmallDevSet/Test'
+#trainParentDir = '/ssd/CAMELYON/SmallDevSet/Train'
+#testParentDir = '/ssd/CAMELYON/SmallDevSet/Test'
+testParentDir = '/ssd/CAMELYON/Test'
+trainParentDir = '/ssd/CAMELYON/Train'
 #testParentDir = '/ssd/CAMELYON/Test'
-maxImPerClass = int(1e3) #Since we are doing kludigy all-data-in-RAM for speed we sub-sample the training datasets
-maxImPerClassTest = int(2e2)
+maxImPerClass = int(50) #Since we are doing kludigy all-data-in-RAM for speed we sub-sample the training datasets
+maxImPerClassTest = int(2.5e4)
 
 # ---- Classifier module architecture  --- #
 
@@ -35,21 +38,29 @@ nIPLayers = len(ipLayerWidth)
 # --- Optimization --- #
 
 baseLR = 1e-4 #Base step size for ADAM optimizer
-nIters = int(5e2) #Number of iterations
+nIters = int(1e4) #Number of iterations
 
 # --- Loggin / saving ---#
 
-logInterval = int(2e1) #How fequently to calculate val accuracy/log loss
-outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/From_ModelXX_FitMLPOnly_Run1'
+logInterval = int(10) #How fequently to calculate val accuracy/log loss
+#outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FinetuneFitC_75kTrain25kTest_Res4i5k'
+#outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FinetuneFitC_CombLoss_75kTrain25kTest_Res4i5k'
+
+#outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FitAll_25kTrain25kTest_Res4i5k'
+outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FineTuneFitC_CombLoss_50Train25kTest_Res4i5k'
+#outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FitCOnly_50Train25kTest_Res4i5k'
+
 
 testOutDir = outputDir + os.path.sep + 'Test'
 trainOutDir = outputDir + os.path.sep + 'Train'
-os.mkdir(testOutDir)
-os.mkdir(trainOutDir)
+if not(os.path.exists(testOutDir)):
+	os.makedirs(testOutDir)
+if not(os.path.exists(trainOutDir)):
+	os.makedirs(trainOutDir)
 
 # --- GPUs -----
 
-gpuID = 0 #GPU to use. -1 is CPU
+gpuID = 3 #GPU to use. -1 is CPU
 if gpuID >= 0:
 	#Make only this GPU visible to TF
 	os.environ["CUDA_VISIBLE_DEVICES"]=str(gpuID)
@@ -94,6 +105,9 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 	batchSize = data.get_shape()[0]
 	Z = tf.get_default_graph().get_tensor_by_name("discriminators_shared/Placeholder_2:0")
 
+	#The Discriminator loss on generator images (for combined loss)
+	loss_DofGofZ = tf.get_default_graph().get_tensor_by_name("discriminators_shared/Mean_1:0")
+
 	print("Done")
 
 	
@@ -120,8 +134,11 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 
 	labels = tf.placeholder("float",shape=(batchSize,nClasses))
 	
-	loss_C = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(forward_C,labels),name='loss_C')
-	#cross_entropy_C = tf.reduce_mean(loss_C)
+	#Loss on classifier only 
+	#loss_C = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(forward_C,labels),name='loss_C')
+	#Combined loss on discriminator and classifier
+	loss_C = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(forward_C,labels),name='loss_C') + loss_DofGofZ
+	
 	
 	
 	evaluation = tf.equal(tf.argmax(forward_C_SoftMax,1),tf.argmax(labels,1))	
@@ -145,6 +162,7 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 
 	#Only optimize the classifier weights
 	optimizer = tf.train.AdamOptimizer(baseLR).minimize(loss_C,var_list=vars_C)
+	#Optimize all weights (fine-tuning on Discriminator)
 	#optimizer = tf.train.AdamOptimizer(baseLR).minimize(loss_C)
 	
 	#TEMP - for testing variable preservation
@@ -161,13 +179,14 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 	nVarTot = len(vars_all)
 	nInit = 0
 	for iVar in range(0,nVarTot):
-		if ~sess.run(tf.is_variable_initialized(vars_all[iVar])):
+		if not(sess.run(tf.is_variable_initialized(vars_all[iVar]))):
 			initVars[nInit] = vars_all[iVar]
-			nInit += 1
-			
+			nInit += 1			
 
 	sess.run(tf.variables_initializer(initVars))
-#	sess.run(tf.global_variables_initializer())
+
+	# print("Initializing ALL variables")	
+	# sess.run(tf.global_variables_initializer())
 
 	test_summary_writer = tf.summary.FileWriter(testOutDir,graph=tf.get_default_graph())
 	train_summary_writer = tf.summary.FileWriter(trainOutDir,graph=tf.get_default_graph())
@@ -180,18 +199,18 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 
 		imBatch,labelBatch = cgo.get_class_batch(trainIms,trainLabels,batchSize)
 		imBatchTest,labelBatchTest = cgo.get_class_batch(testIms,testLabels,batchSize)
-		ZBatch = np.random.uniform(-1,1,(batchSize,Z.get_shape()[1]))	#Tensorflow complains if you don't feed Z even though we're not using it	
+		ZBatch = np.random.uniform(-1,1,(batchSize,Z.get_shape()[1]))	#For combined loss experiments
 
 		optimizer.run(feed_dict={data:imBatch, labels:labelBatch, Z:ZBatch})
 
 		if iIter%logInterval == 0:
 			iVal += 1
 
-			summary_train,train_loss,train_acc= sess.run([summary_op,loss_C,accuracy],feed_dict={data:trainImBatch})
-			summary_test,test_loss,test_acc= sess.run([summary_op,loss_C,accuracy],feed_dict={data:testImBatch})
+			summary_train,train_loss,train_acc= sess.run([summary_op,loss_C,accuracy],feed_dict={data:imBatch, labels:labelBatch, Z:ZBatch})
+			summary_test,test_loss,test_acc= sess.run([summary_op,loss_C,accuracy],feed_dict={data:imBatchTest, labels:labelBatch, Z:ZBatch})
 			
-			train_summary_writer.add_summary(summary_train)
-			test_summary_writer.add_summary(summary_test)
+			train_summary_writer.add_summary(summary_train,iIter)
+			test_summary_writer.add_summary(summary_test,iIter)
 			
 			print("Training loss " + str(train_loss) + ", accuracy " + str(train_acc) + " Test loss " + str(test_loss) + ", accuracy " + str(test_acc))			
 			print("Iteration " + str(iIter) + " of " + str(nIters))
