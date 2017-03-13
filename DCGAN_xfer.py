@@ -44,10 +44,10 @@ nIters = int(1e4) #Number of iterations
 
 logInterval = int(10) #How fequently to calculate val accuracy/log loss
 #outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FinetuneFitC_75kTrain25kTest_Res4i5k'
-#outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FinetuneFitC_CombLoss_75kTrain25kTest_Res4i5k'
+outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FinetuneFitC_CombLoss_75kTrain25kTest_Res4i5k'
 
 #outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FitAll_25kTrain25kTest_Res4i5k'
-outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FineTuneFitC_CombLoss_50Train25kTest_Res4i5k'
+#outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FineTuneFitC_CombLoss_50Train25kTest_Res4i5k'
 #outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FitCOnly_50Train25kTest_Res4i5k'
 
 
@@ -57,6 +57,13 @@ if not(os.path.exists(testOutDir)):
 	os.makedirs(testOutDir)
 if not(os.path.exists(trainOutDir)):
 	os.makedirs(trainOutDir)
+
+saveInterval = int(1e3) #How frequently to save snapshots. If zero no saving.
+snapOutDir = outputDir + os.path.sep + 'Snapshots'
+baseSnapName = 'CAMELYON_xfer_'
+if not(os.path.exists(snapOutDir)):
+	os.makedirs(snapOutDir)
+
 
 # --- GPUs -----
 
@@ -215,6 +222,10 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 			print("Training loss " + str(train_loss) + ", accuracy " + str(train_acc) + " Test loss " + str(test_loss) + ", accuracy " + str(test_acc))			
 			print("Iteration " + str(iIter) + " of " + str(nIters))
 
+		if saveInterval > 0 and (iIter%saveInterval == 0 or iIter == (nIters - 1)):
+			outFile = snapOutDir + os.path.sep + baseSnapName + '_iter' + str(iIter) + '.ckpt'
+			save_path = saver.save(sess,outFile)
+  			print("Model saved in file: " + save_path)
 
 
 
