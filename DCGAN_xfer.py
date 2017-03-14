@@ -15,7 +15,7 @@ import cam_gan_ops as cgo
 # ---------- Specify unsupervised model -------#
 #This model, trained in a fully unsupervised manner, is used for initialization
 
-initModel = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN/Snapshots/CAMELYON_Balanced_EarlyStart60kPer3_128_resume4_iter5000.ckpt'
+initModel = '/media/hunter/New Volume/CAMELYON16_GAN_Snapshots/CAMELYON_Balanced_EarlyStart60kPer3_128_resume4_iter5000.ckpt'
 
 
 # ---- Specify data ----- 
@@ -23,11 +23,11 @@ initModel = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN/Snapshots/C
 #trainParentDir = '/ssd/CAMELYON/Train'
 #trainParentDir = '/ssd/CAMELYON/SmallDevSet/Train'
 #testParentDir = '/ssd/CAMELYON/SmallDevSet/Test'
-testParentDir = '/ssd/CAMELYON/Test'
-trainParentDir = '/ssd/CAMELYON/Train'
+testParentDir = '/media/hunter/New Volume/CAMELYON16_subsetData/Test'
+trainParentDir = '/media/hunter/New Volume/CAMELYON16_subsetData/Train'
 #testParentDir = '/ssd/CAMELYON/Test'
-maxImPerClass = int(50) #Since we are doing kludigy all-data-in-RAM for speed we sub-sample the training datasets
-maxImPerClassTest = int(2.5e4)
+maxImPerClass = int(5e3) #Since we are doing kludigy all-data-in-RAM for speed we sub-sample the training datasets
+maxImPerClassTest = int(1e3)
 
 # ---- Classifier module architecture  --- #
 
@@ -44,7 +44,7 @@ nIters = int(1e4) #Number of iterations
 
 logInterval = int(10) #How fequently to calculate val accuracy/log loss
 #outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FinetuneFitC_75kTrain25kTest_Res4i5k'
-outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FinetuneFitC_CombLoss_75kTrain25kTest_Res4i5k'
+outputDir = '/media/hunter/New Volume/camgan_xfertraining'
 
 #outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FitAll_25kTrain25kTest_Res4i5k'
 #outputDir = '/home/he19/files/CellBiology/IDAC/Projects/CAMELYON/GAN_Xfer/FineTuneFitC_CombLoss_50Train25kTest_Res4i5k'
@@ -60,14 +60,14 @@ if not(os.path.exists(trainOutDir)):
 
 saveInterval = int(1e3) #How frequently to save snapshots. If zero no saving.
 snapOutDir = outputDir + os.path.sep + 'Snapshots'
-baseSnapName = 'CAMELYON_xfer_'
+baseSnapName = 'CAMELYON_xfer_FitMLPOnly'
 if not(os.path.exists(snapOutDir)):
 	os.makedirs(snapOutDir)
 
 
 # --- GPUs -----
 
-gpuID = 3 #GPU to use. -1 is CPU
+gpuID = 0 #GPU to use. -1 is CPU
 if gpuID >= 0:
 	#Make only this GPU visible to TF
 	os.environ["CUDA_VISIBLE_DEVICES"]=str(gpuID)
@@ -142,9 +142,9 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 	labels = tf.placeholder("float",shape=(batchSize,nClasses))
 	
 	#Loss on classifier only 
-	#loss_C = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(forward_C,labels),name='loss_C')
+	loss_C = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=forward_C,labels=labels),name='loss_C')
 	#Combined loss on discriminator and classifier
-	loss_C = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(forward_C,labels),name='loss_C') + loss_DofGofZ
+	#loss_C = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=forward_C,labels=labels),name='loss_C') + loss_DofGofZ
 	
 	
 	
@@ -222,7 +222,7 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
 			print("Training loss " + str(train_loss) + ", accuracy " + str(train_acc) + " Test loss " + str(test_loss) + ", accuracy " + str(test_acc))			
 			print("Iteration " + str(iIter) + " of " + str(nIters))
 
-		if saveInterval > 0 and (iIter%saveInterval == 0 or iIter == (nIters - 1)):
+		if saveInterval > 0 and iIter > 0 and (iIter%saveInterval == 0 or iIter == (nIters - 1)):
 			outFile = snapOutDir + os.path.sep + baseSnapName + '_iter' + str(iIter) + '.ckpt'
 			save_path = saver.save(sess,outFile)
   			print("Model saved in file: " + save_path)
