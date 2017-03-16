@@ -7,7 +7,7 @@ import cam_gan_ops as cgo
 
 # --- Device ----- #
 
-devID = 3  #GPU to use. -1 is CPU
+devID = 0  #GPU to use. -1 is CPU
 if devID >= 0:
 	#Make only this GPU visible to TF
 	os.environ["CUDA_VISIBLE_DEVICES"]=str(devID)
@@ -21,14 +21,14 @@ else:
 
 # ---- input ----- #
 
-#modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
-modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+#modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
 # dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/CEMELYON_MixedMedTest_1.tfrecords',
 # 	'/home/hunter/Desktop/TEMP_LOCAL/CEMELYON_MixedMedTest_1.tfrecords']
 # dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/MNIST/train.tfrecords',
 # 			 '/home/hunter/Desktop/TEMP_LOCAL/data/MNIST/test.tfrecords']
-#dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test.tfrecords']
-dataFiles = ['/media/extra/hunter_temp/camelyon_test_10k.tfrecords']
+dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_10k.tfrecords']
+#dataFiles = ['/media/extra/hunter_temp/camelyon_test_10k.tfrecords']
 
 nFiles = len(dataFiles)
 
@@ -61,6 +61,7 @@ def get_image(file_queue):
 	return image
 
 start_time = time.time();
+print("Initializing...")
 batch_size = 128
 
 #Initialize the input queue ops on the CPU
@@ -127,6 +128,10 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(devString): 
 	coord = tf.train.Coordinator()
 	threads = tf.train.start_queue_runners(coord=coord,sess=sess)
 
+	end_time = time.time();
+	print("Finished initialization. Elapsed time: " + str(end_time-start_time) + " seconds.")
+	print("Starting inference...")
+	start_time = time.time()
 
 	#im_shape = sess.run(im_shape)
 
@@ -160,7 +165,7 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(devString): 
 	sess.close()
 
 end_time = time.time();
-print("Finished conversion. Elapsed time: " + str(end_time-start_time) + " seconds.")
+print("Finished inference. Elapsed time: " + str(end_time-start_time) + " seconds.")
 
 # 	reader = tf.TFRecordReader()
 # #	key, serial_record = sess.run(reader.read(file_queue))
