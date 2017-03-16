@@ -7,10 +7,11 @@ import cam_gan_ops as cgo
 
 # --- Device ----- #
 
-devID = 0  #GPU to use. -1 is CPU
+devID = 3  #GPU to use. -1 is CPU
 if devID >= 0:
 	#Make only this GPU visible to TF
 	os.environ["CUDA_VISIBLE_DEVICES"]=str(devID)
+#	os.environ["CUDA_VISIBLE_DEVICES"]="2,3"
 	devString = '/gpu:0' #TF will now think the visible GPU is 0...
 else:
 	devString = '/cpu:0' #Will still use multiple cores if present
@@ -21,14 +22,14 @@ else:
 
 # ---- input ----- #
 
-modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
-#modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+#modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
 # dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/CEMELYON_MixedMedTest_1.tfrecords',
 # 	'/home/hunter/Desktop/TEMP_LOCAL/CEMELYON_MixedMedTest_1.tfrecords']
 # dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/MNIST/train.tfrecords',
 # 			 '/home/hunter/Desktop/TEMP_LOCAL/data/MNIST/test.tfrecords']
-dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_10k.tfrecords']
-#dataFiles = ['/media/extra/hunter_temp/camelyon_test_10k.tfrecords']
+#dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_10k.tfrecords']
+dataFiles = ['/media/extra/hunter_temp/camelyon_test_10k.tfrecords']
 
 nFiles = len(dataFiles)
 
@@ -73,7 +74,7 @@ with tf.device('/cpu:0'):
 	image = get_image(file_queue)
 
 	images = tf.train.batch(
-        [image], batch_size=batch_size, num_threads=2,
+        [image], batch_size=batch_size, num_threads=8,
         capacity=5000 + 3 * batch_size)
 
 	# images = tf.train.shuffle_batch(
@@ -91,7 +92,7 @@ with tf.device('/cpu:0'):
 
 # ---- inference ------ #
 
-with tf.variable_scope("discriminators_shared") as scope, tf.device(devString): #, tf.Session() as sess
+with tf.variable_scope("discriminators_shared") as scope:#, tf.device(devString): #, tf.Session() as sess
 
 	# reader = tf.TFRecordReader()
 	# key, serial_record = reader.read(file_queue)
@@ -107,6 +108,7 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(devString): 
 
 	#Some ops in our GAN don't support GPU so allow TF to do the device placement when necessary
 	sessConfig = tf.ConfigProto(allow_soft_placement=True)
+#	sessConfig.gpu_options.allow_growth=True
 	sess = tf.Session(config=sessConfig)
 	sess.run(tf.local_variables_initializer())
 	
