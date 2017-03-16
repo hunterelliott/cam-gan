@@ -54,7 +54,7 @@ else:
 	os.environ["CUDA_VISIBLE_DEVICES"]=''
 
 #task_ind = 1
-worker_hosts = ['pathai1.local:2222','pathai3.local:2223']
+worker_hosts = ['192.168.1.2:2222','192.168.1.48.local:2223']
 
 
 
