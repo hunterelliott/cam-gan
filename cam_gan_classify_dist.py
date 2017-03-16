@@ -20,15 +20,18 @@ args = parser.parse_args()
 devID = args.gpu
 task_ind = args.task_id
 
-modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
-#modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+#modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
 # dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/CEMELYON_MixedMedTest_1.tfrecords',
 # 	'/home/hunter/Desktop/TEMP_LOCAL/CEMELYON_MixedMedTest_1.tfrecords']
 # dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/MNIST/train.tfrecords',
 # 			 '/home/hunter/Desktop/TEMP_LOCAL/data/MNIST/test.tfrecords']
 #dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_10k.tfrecords']
-dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_5k.tfrecords',
-			 '/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_5k_2.tfrecords']
+#dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_5k.tfrecords',
+#			 '/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_5k_2.tfrecords']
+dataFiles = ['/media/extra/hunter_temp/camelyon_test_10k.tfrecords',
+			 '/media/extra/hunter_temp/camelyon_test_10k_2.tfrecords']
+
 #dataFiles = ['/media/extra/hunter_temp/camelyon_test_10k.tfrecords']
 
 nFiles = len(dataFiles)
@@ -51,7 +54,7 @@ else:
 	os.environ["CUDA_VISIBLE_DEVICES"]=''
 
 #task_ind = 1
-worker_hosts = ['localhost:2222','localhost:2223']
+worker_hosts = ['pathai1.local:2222','pathai3.local:2223']
 
 
 
@@ -99,8 +102,8 @@ with tf.device('/job:local/task:0'):
 
 	try:
 		images = tf.train.batch(
-	        [image], batch_size=batch_size, num_threads=8,
-	        capacity=1000 + 3 * batch_size,shared_name='shared_image_queue')
+	        [image], batch_size=batch_size, num_threads=16,
+	        capacity=5000 + 3 * batch_size,shared_name='shared_image_queue')
 	except:
 		print("Queue exhausted...")
 

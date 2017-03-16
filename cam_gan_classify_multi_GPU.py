@@ -16,20 +16,21 @@ import cam_gan_ops as cgo
 # 	devString = '/cpu:0' #Will still use multiple cores if present
 # 	os.environ["CUDA_VISIBLE_DEVICES"]=''
 
-device_list = ['/cpu:0','/gpu:0']
+device_list = ['/gpu:0','/gpu:1']
+os.environ["CUDA_VISIBLE_DEVICES"]="2,3"
 nDevice = len(device_list)
 
 
 # ---- input ----- #
 
-modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
-#modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+#modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
 # dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/CEMELYON_MixedMedTest_1.tfrecords',
 # 	'/home/hunter/Desktop/TEMP_LOCAL/CEMELYON_MixedMedTest_1.tfrecords']
 # dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/MNIST/train.tfrecords',
 # 			 '/home/hunter/Desktop/TEMP_LOCAL/data/MNIST/test.tfrecords']
-dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_10k.tfrecords']
-#dataFiles = ['/media/extra/hunter_temp/camelyon_test_10k.tfrecords']
+#dataFiles = ['/home/hunter/Desktop/TEMP_LOCAL/data/camelyon_test_10k.tfrecords']
+dataFiles = ['/media/extra/hunter_temp/camelyon_test_10k.tfrecords']
 
 nFiles = len(dataFiles)
 
@@ -152,14 +153,18 @@ with tf.variable_scope("discriminators_shared") as scope:#, tf.device(devString)
 		nIm_proc = 0
 		while not(coord.should_stop()):
 
-			#Get a batch of images
-			ims = sess.run(images)
+			for d in device_list:
 
-			#Run inference on them
-			pred = sess.run(predict,feed_dict={data:ims})
+				with tf.device(d):
+
+					#Get a batch of images
+					ims = sess.run(images)
+
+					#Run inference on them
+					pred = sess.run(predict,feed_dict={data:ims})
 
 
-			nIm_proc += ims.shape[0]
+					nIm_proc += ims.shape[0]
 
 			if nIm_proc%100 == 0:
 				print("Finished " + str(nIm_proc) + " images")
