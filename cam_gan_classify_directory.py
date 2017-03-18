@@ -46,8 +46,9 @@ def get_image(file_queue):
 	
 	reader = tf.WholeFileReader()
 	key,image_data = reader.read(file_queue)
-
+	# image_data = tf.read_file(file_queue)
 	image = tf.image.decode_image(image_data)	
+
 
 
 	return image
@@ -76,7 +77,9 @@ with tf.device('/cpu:0'):
 
 	image = get_image(file_queue)
 
-	images = get_image_batch(file_queue,batch_size)
+
+	images = tf.train.batch([image],batch_size,num_threads=1,capacity=1000,shapes=[256,256,3])
+	#images = get_image_batch(file_queue,batch_size)
 
 
 
