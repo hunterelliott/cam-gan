@@ -7,7 +7,7 @@ import cam_gan_ops as cgo
 
 # --- Device ----- #
 
-devID = -1  #GPU to use. -1 is CPU
+devID = 0  #GPU to use. -1 is CPU
 if devID >= 0:
 	#Make only this GPU visible to TF
 	os.environ["CUDA_VISIBLE_DEVICES"]=str(devID)
@@ -21,11 +21,13 @@ else:
 
 # ---- input ----- #
 
-#modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
 #modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
-modelFile = '/home/hunter/Desktop/TEMP_LOCAL/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+#modelFile = '/home/hunter/Desktop/TEMP_LOCAL/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
 
-dataDir = '/home/hunter/Desktop/TEMP_LOCAL/Data/CAMELYON/MixedForInferenceTest'
+#dataDir = '/home/hunter/Desktop/TEMP_LOCAL/Data/CAMELYON/MixedForInferenceTest'
+dataDir = '/home/hunter/Desktop/TEMP_LOCAL/data/CAMELYON16_MixedForInferenceTest'
+
 dataFiles = os.listdir(dataDir)
 
 
@@ -72,13 +74,13 @@ batch_size = 128
 #Initialize the input queue ops on the CPU
 with tf.device('/cpu:0'):
 
-	file_queue = tf.train.string_input_producer(dataFiles,capacity=1e4,shared_name=
+	file_queue = tf.train.string_input_producer(dataFiles,capacity=5000,shared_name=
 		    'chief_queue',num_epochs=1,shuffle=False)
 
 	image = get_image(file_queue)
 
 
-	images = tf.train.batch([image],batch_size,num_threads=1,capacity=1000,shapes=[256,256,3])
+	images = tf.train.batch([image],batch_size,num_threads=8,capacity=1280,shapes=[256,256,3])
 	#images = get_image_batch(file_queue,batch_size)
 
 
@@ -133,8 +135,10 @@ with tf.variable_scope("discriminators_shared") as scope:#, tf.device(devString)
 		while not(coord.should_stop()):
 
 			#Get a batch of images
-			ims = sess.run(images)
-			ims = sess.run(tf.image.resize_images(ims,[128, 128]))
+			#ims = sess.run(images)
+			#ims = sess.run(tf.image.resize_images(ims,[128, 128]))
+
+			ims = sess.run(tf.image.resize_images(images,[128, 128]))
 
 			#Run inference on them
 			pred = sess.run(predict,feed_dict={data:ims})
