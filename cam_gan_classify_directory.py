@@ -21,12 +21,13 @@ else:
 
 # ---- input ----- #
 
-modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
-#modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+#modelFile = '/media/hunter/New Volume/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
+modelFile = '/media/extra/hunter_temp/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
 #modelFile = '/home/hunter/Desktop/TEMP_LOCAL/camgan_xfertraining/Snapshots/CAMELYON_xfer_FitMLPOnly_iter2000.ckpt'
 
 #dataDir = '/home/hunter/Desktop/TEMP_LOCAL/Data/CAMELYON/MixedForInferenceTest'
-dataDir = '/home/hunter/Desktop/TEMP_LOCAL/data/CAMELYON16_MixedForInferenceTest'
+#dataDir = '/home/hunter/Desktop/TEMP_LOCAL/data/CAMELYON16_MixedForInferenceTest'
+dataDir = '/media/extra/CAMELYON16_MixedForInferenceTest'
 
 dataFiles = os.listdir(dataDir)
 
@@ -80,7 +81,7 @@ with tf.device('/cpu:0'):
 	image = get_image(file_queue)
 
 
-	images = tf.train.batch([image],batch_size,num_threads=8,capacity=1280,shapes=[256,256,3])
+	images = tf.train.batch([image],batch_size,num_threads=8,capacity=batch_size*10,shapes=[256,256,3])
 	#images = get_image_batch(file_queue,batch_size)
 
 
