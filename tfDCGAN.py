@@ -38,7 +38,7 @@ batchNormIPLayer = (False,)
 #ipLayerWidth = (128,)
 #batchNormIPLayer = (False,)
 kernelSize = (5,5) #filter kernel support
-maxImLoadPerClass = int(5e0) #For datasets too large to fit in memory load a random subset
+maxImLoadPerClass = int(2e3) #For datasets too large to fit in memory load a random subset
 
 zDims = 100 #Dimensionality of noise vector which is input of generator
 
@@ -53,7 +53,7 @@ baseLR_D = 2e-4 #Base learning rate for discriminator
 #baseLR_G = baseLR_D * .7
 baseLR_G = baseLR_D
 beta1 = .5 #Beta 1 1st momement momentum in ADAM optimizer. Radford and Metz recommend lower than default of .5
-nIters = int(1e4) #Number of iterations)
+nIters = int(2e4) #Number of iterations)
 logInterval = 20 #Display loss every N iters
 
 k_D = 1 #Number of discrimator updates per iteration (this was usually 1 in goodfellow 2014)
@@ -528,95 +528,95 @@ with tf.variable_scope("discriminators_shared") as scope, tf.device(gpuString):
     #----------------------------------
     # ----- optimization -----
 
-    print("Starting optimization...")
-    startTime = time.time();
+print("Starting optimization...")
+startTime = time.time();
 
-    loss_log_D = np.zeros(int(math.floor(nIters/logInterval)))
-    loss_log_G = np.zeros(int(math.floor(nIters/logInterval)))
-    accuracy_log_D = np.zeros(int(math.floor(nIters/logInterval)))
-    accuracy_log_DofG = np.zeros(int(math.floor(nIters/logInterval)))
+loss_log_D = np.zeros(int(math.floor(nIters/logInterval)))
+loss_log_G = np.zeros(int(math.floor(nIters/logInterval)))
+accuracy_log_D = np.zeros(int(math.floor(nIters/logInterval)))
+accuracy_log_DofG = np.zeros(int(math.floor(nIters/logInterval)))
 
-    sess = tf.InteractiveSession() #Need interactive session?? switch to regular...
-    #sess = tf.Session() #Need interactive session?? switch to regular...
+sess = tf.InteractiveSession() #Need interactive session?? switch to regular...
+#sess = tf.Session() #Need interactive session?? switch to regular...
 
-    #Get variable lists so we can independently update the generator and discriminator
-    vars_All = tf.trainable_variables()
-    vars_G = [var for var in vars_All if '_G' in var.name]
-    vars_D = [var for var in vars_All if '_D' in var.name]
+#Get variable lists so we can independently update the generator and discriminator
+vars_All = tf.trainable_variables()
+vars_G = [var for var in vars_All if '_G' in var.name]
+vars_D = [var for var in vars_All if '_D' in var.name]
 
-    sess.run(tf.global_variables_initializer())
+sess.run(tf.global_variables_initializer())
 
-    optimizer_D = tf.train.AdamOptimizer(baseLR_D,beta1).minimize(loss_D,var_list=vars_D)
-    optimizer_G = tf.train.AdamOptimizer(baseLR_G,beta1).minimize(loss_G,var_list=vars_G)
+optimizer_D = tf.train.AdamOptimizer(baseLR_D,beta1).minimize(loss_D,var_list=vars_D)
+optimizer_G = tf.train.AdamOptimizer(baseLR_G,beta1).minimize(loss_G,var_list=vars_G)
 
-    sess.run(tf.global_variables_initializer())
+sess.run(tf.global_variables_initializer())
 
-    if saveInterval  > 0:
-        with tf.device('/cpu:0'):
-            saver = tf.train.Saver()
+if saveInterval  > 0:
+    with tf.device('/cpu:0'):
+        saver = tf.train.Saver()
 
-    if restoreModel:
-        print("restoring model from file: " + restoreFile)
-        saver.restore(sess,restoreFile)
+if restoreModel:
+    print("restoring model from file: " + restoreFile)
+    saver.restore(sess,restoreFile)
 
-    iLog = -1
+iLog = -1
 
-    for i in range(nIters):
-
-
-        # -- Update the discriminator
-
-        for k in range(0,k_D):
-
-            iTrainBatch = np.random.randint(0,nTrainTot-1,batchSize)
-            #trainImBatch = np.expand_dims(np.transpose(trainIms[:,:,iTrainBatch],(2,0,1,3)),3)
-            trainImBatch = np.transpose(trainIms[:,:,iTrainBatch],(2,0,1,3))
-
-            trainZBatch = np.random.uniform(-1,1,(batchSize,zDims))
-
-            optimizer_D.run(feed_dict={data:trainImBatch, Z:trainZBatch})
+for i in range(nIters):
 
 
-        # -- Update the generator
+    # -- Update the discriminator
 
-        for k in range(k_G):
+    for k in range(0,k_D):
 
-            trainZBatch = np.random.uniform(-1,1,(batchSize,zDims))
+        iTrainBatch = np.random.randint(0,nTrainTot-1,batchSize)
+        #trainImBatch = np.expand_dims(np.transpose(trainIms[:,:,iTrainBatch],(2,0,1,3)),3)
+        trainImBatch = np.transpose(trainIms[:,:,iTrainBatch],(2,0,1,3))
 
-            optimizer_G.run(feed_dict={Z:trainZBatch})
+        trainZBatch = np.random.uniform(-1,1,(batchSize,zDims))
 
-
-
-        #Log loss intermittently
-        if i%logInterval == 0:
-
-            iLog += 1
-            loss_log_D[iLog] = loss_D.eval(feed_dict={data:trainImBatch, Z:trainZBatch})
-            loss_log_G[iLog] = loss_G.eval(feed_dict={Z:trainZBatch})
-
-            accuracy_log_D[iLog] =accuracy_D.eval(feed_dict={data:trainImBatch})
-            accuracy_log_DofG[iLog] =accuracy_DofG.eval(feed_dict={Z:trainZBatch})
-
-            print("Discrimator loss: " + str(loss_log_D[iLog]) + ", generator loss: " + str(loss_log_G[iLog]))
-            print("Discrimator accuracy on data : " + str(accuracy_log_D[iLog]) + ", on generator output: " + str(accuracy_log_DofG[iLog]))
-            print("Iteration " + str(i) + " of " + str(nIters))
-
-        if saveInterval > 0 and (i%saveInterval == 0 or i == (nIters - 1)):
-            outFile = snapshotDir + os.path.sep + baseName + '_iter' + str(i) + '.ckpt'
-            save_path = saver.save(sess,outFile)
-            print("Model saved in file: " + save_path)
-
-    #Generate some examples
-    genIms = forward_G.eval(feed_dict={Z: np.random.uniform(-1,1,(batchSize,zDims))})
-
-    endTime = time.time();
-    print("Finished optimization. Elapsed time: ")
-    print(endTime-startTime)
-
-    #sess.close()
+        optimizer_D.run(feed_dict={data:trainImBatch, Z:trainZBatch})
 
 
-    if showPlots:
+    # -- Update the generator
 
-        plotResults(loss_log_D,loss_log_G,accuracy_log_D,accuracy_log_DofG,batchSize,genIms)
+    for k in range(k_G):
+
+        trainZBatch = np.random.uniform(-1,1,(batchSize,zDims))
+
+        optimizer_G.run(feed_dict={Z:trainZBatch})
+
+
+
+    #Log loss intermittently
+    if i%logInterval == 0:
+
+        iLog += 1
+        loss_log_D[iLog] = loss_D.eval(feed_dict={data:trainImBatch, Z:trainZBatch})
+        loss_log_G[iLog] = loss_G.eval(feed_dict={Z:trainZBatch})
+
+        accuracy_log_D[iLog] =accuracy_D.eval(feed_dict={data:trainImBatch})
+        accuracy_log_DofG[iLog] =accuracy_DofG.eval(feed_dict={Z:trainZBatch})
+
+        print("Discrimator loss: " + str(loss_log_D[iLog]) + ", generator loss: " + str(loss_log_G[iLog]))
+        print("Discrimator accuracy on data : " + str(accuracy_log_D[iLog]) + ", on generator output: " + str(accuracy_log_DofG[iLog]))
+        print("Iteration " + str(i) + " of " + str(nIters))
+
+    if saveInterval > 0 and (i%saveInterval == 0 or i == (nIters - 1)):
+        outFile = snapshotDir + os.path.sep + baseName + '_iter' + str(i) + '.ckpt'
+        save_path = saver.save(sess,outFile)
+        print("Model saved in file: " + save_path)
+
+#Generate some examples
+genIms = forward_G.eval(feed_dict={Z: np.random.uniform(-1,1,(batchSize,zDims))})
+
+endTime = time.time();
+print("Finished optimization. Elapsed time: ")
+print(endTime-startTime)
+
+#sess.close()
+
+
+if showPlots:
+
+    plotResults(loss_log_D,loss_log_G,accuracy_log_D,accuracy_log_DofG,batchSize,genIms)
 
